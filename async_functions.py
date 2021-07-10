@@ -145,8 +145,10 @@ async def addDataInv(uid):
   if str(uid) in user:
     return False
   else:
-    user = {}
-    user[str(uid)] = ['g01-01_00/00']
+    user[str(uid)] = {}
+    user[str(uid)]["item1"] = '0'
+    
+    
     
 
 

@@ -1,6 +1,6 @@
 import discord
 from discord.ext import commands
-from async_functions import addDataCombatInv, getDataCombatInv,chanceExp, getDataBal
+from async_functions import addDataCombatInv, getDataCombatInv,chanceExp, getDataBal, getDataInv
 import random
 import json
 import asyncio
@@ -73,100 +73,152 @@ class Inventory(commands.Cog):
 
 
   @commands.command()
-  async def buy(self,ctx,*args):
+  async def buy(self,ctx,c, itemno = None):
     uid = ctx.message.author.id
     await chanceExp(uid)
-    c = ''
-    for arg in args:
-      c = c +arg
     
     
-    itemprices = ['1g','1g','2g','3g','4g','1g','3g','2g','1g','3g','1g','2g']
-    itemids = ['g01','g02','g03','g04','g05','a01','a02','h01','h02','h03','h04','h05']
-    itemnames=['semiautopistol','assaultrifle','sniperrifle','submachinegun', 'grenade','kevlarvest','riothelmet','smokebomb','cocainestimulant','coffee','gasshell','firstaidkit']
+    
+    combatitemprices = ['1g','1g','2g','3g','4g','1g','3g','2g','1g','3g','1g','2g']
+    combatitemids = ['g01','g02','g03','g04','g05','a01','a02','h01','h02','h03','h04','h05']
+    combatitemnames=['semiautopistol','assaultrifle','sniperrifle','submachinegun', 'grenade','kevlarvest','riothelmet','smokebomb','cocainestimulant','coffee','gasshell','firstaidkit']
+
+    itemprices = ['1000c','2000c']
+    
+    itemnames = ['item1','item2']
     bal = await getDataBal()
     guntokens = bal[str(uid)]["guntokens"]
     wallet = bal[str(uid)]["wallet"]
-    inv = await getDataCombatInv()
+    combatinv = await getDataCombatInv()
+    inv = await getDataInv()
+    #combatinv buy
 
+    def findStr(string,arr):
+      for i in arr:
+        if string in i:
+          return True
 
-    if c in itemnames:
-      if len(inv[str(uid)]) < 10:
-        itemid = itemids[itemnames.index(c)]
+    
+      
+    if c in combatitemnames and itemno == None:
+      
+      if findStr(combatitemids[combatitemnames.index(c)],combatinv[str(uid)]) ==None:
+        
+        if len(combatinv[str(uid)]) < 10:
+          itemid = combatitemids[combatitemnames.index(c)]
+          if itemid.startswith("g"):
+            itemid = itemid+"-01_00/00"
+          if itemid.startswith("h"):
+            itemid = itemid+"-01"
+          if itemid.startswith("a"):
+            itemid = itemid+"-01_00"
+          itemprice = combatitemprices[combatitemnames.index(c)]
+          if itemprice.endswith("g"):
+            x= itemprice.split("g")
+            value = x[0]
+            if guntokens >= int(value):
+              await ctx.send("The item `" +c+"` will set you back `"+value+"` guntokens. Are you sure you wanna buy it?\nType `y` or `n`.")
+            elif guntokens < int(value):
+              await ctx.send("You don't have enough guntokens to complete this purchase.")
+              raise Exception
+          def check(msg):
+            return msg.author == ctx.author and msg.channel == ctx.channel and msg.content.lower() in ['y','n']
+          try:
+            msg = await self.bot.wait_for("message",timeout=30,check=check)
+            if msg.content == 'y':
+              d = {"guntokens": bal[str(uid)]["guntokens"] - int(value)}
+              bal[str(uid)].update(d)
+              combatinv[str(uid)].append(str(itemid))
+              with open("./json_files/userBal.json","w") as f:
+                json.dump(bal,f)
+              with open("./json_files/userCombatInv.json","w") as f:
+                json.dump(combatinv,f)
+              await ctx.reply("You bought `"+c+"` successfully.")
+            if msg.content == 'n':
+              await ctx.send("You cancelled your purchase.") 
+          except asyncio.TimeoutError:
+            await ctx.send("You didn't reply in time, so I've cancelled your purchase.")
+        else:
+          await ctx.send("Your combat inventory is too full! Sell an item free up an inventory slot.")
+      else:
+        await ctx.send("You already have an item of the same type!")
 
-        if itemid.startswith("g"):
-          itemid = itemid+"-01_00/00"
-        if itemid.startswith("h"):
-          
-          itemid = itemid+"-01"
-        if itemid.startswith("a"):
-          itemid = itemid+"-01_00"
-
-
-
-
-        itemprice = itemprices[itemnames.index(c)]
-        if itemprice.endswith("g"):
-          x= itemprice.split("g")
-          value = x[0]
-          ty = "guntokens"
-          if guntokens >= int(value):
-            await ctx.send("The item `" +c+"` will set you back `"+value+"` guntokens. Are you sure you wanna buy it?\nType `y` or `n`.")
-          elif guntokens < int(value):
-            await ctx.send("You don't have enough guntokens to complete this purchase.")
-            raise Exception
-
-
-        if itemprice.endswith("c"):
+    #normalinv buy
+    elif c in itemnames:
+      
+      itemprice = itemprices[itemnames.index(c)]
+      if itemno == None:
+        itemno = 1
+      
+      if itemprice.endswith("c"):
           x= itemprice.split("c")
-          value = x[0]
-          ty = "wallet"
-          print(wallet)
+          value = int(x[0])*int(itemno)
+          
+          
           if wallet >= int(value):
-            await ctx.send("The item `" +c+"` will set you back Cy$`"+value+"`. Are you sure you wanna buy it?\nType `y` or `n`.")
+            d = {"wallet": bal[str(uid)]["wallet"] - int(value)}
+            bal[str(uid)].update(d)
+            
+            if not c in inv[str(uid)]:
+              
+              inv[str(uid)][c] = itemno
+            else:
+              
+              e = {c: int(inv[str(uid)][c]) + int(itemno)}
+              inv[str(uid)].update(e)
+            
+            with open("./json_files/userBal.json","w") as f:
+              json.dump(bal,f)
+            with open("./json_files/userInv.json","w") as f:
+              json.dump(inv,f)
+
+            await ctx.reply("You bought "+itemno+" `"+c+"` successfully.")
             
           elif wallet < int(value):
             await ctx.send("You don't have enough money in your wallet to complete this purchase.")
             raise Exception
-
-
-        def check(msg):
-          return msg.author == ctx.author and msg.channel == ctx.channel and msg.content.lower() in ['y','n']
-        try:
-          msg = await self.bot.wait_for("message",timeout=30,check=check)
-          if msg.content == 'y':
-            d = {ty: bal[str(uid)][ty] - int(value)}
-            bal[str(uid)].update(d)
-            
-            inv[str(uid)].append(str(itemid))
-            
-            
-            with open("./json_files/userBal.json","w") as f:
-              json.dump(bal,f)
-            with open("./json_files/userCombatInv.json","w") as f:
-              json.dump(inv,f)
-
-            await ctx.reply("You bought `"+c+"` successfully.")
-
-          if msg.content == 'n':
-            await ctx.send("You cancelled your purchase.")
-          
-          
-        except asyncio.TimeoutError:
-          await ctx.send("You didn't reply in time, so I've cancelled your purchase.")
-      else:
-        await ctx.send("Your combat inventory is too full! Sell an item free up an inventory slot.")
-
-      
     else:
       await ctx.send("That's not a valid item!")
       raise Exception
 
 
+  @commands.command()
+  async def sell(self,ctx,c):
+    uid = ctx.message.author.id
+    combatitemprices = ['1g','1g','2g','3g','4g','1g','3g','2g','1g','3g','1g','2g']
+    combatitemids = ['g01','g02','g03','g04','g05','a01','a02','h01','h02','h03','h04','h05']
+    combatitemnames=['semiautopistol','assaultrifle','sniperrifle','submachinegun', 'grenade','kevlarvest','riothelmet','smokebomb','cocainestimulant','coffee','gasshell','firstaidkit']
 
-    
+    itemprices = ['1000c','2000c']
       
-    
+    itemnames = ['item1','item2']
+
+    bal = await getDataBal()
+    guntokens = bal[str(uid)]["guntokens"]
+    wallet = bal[str(uid)]["wallet"]
+    combatinv = await getDataCombatInv()
+    inv = await getDataInv()
+
+    def findStrTorN(string,arr):
+        for i in arr:
+          if string in i:
+            return True
+
+    def findStr(string,arr):
+        for i in arr:
+          if string in i:
+            return i
+   
+    if c in combatitemnames:
+      tid = combatitemids[combatitemnames.index(c)]
+      
+      if findStrTorN(tid, combatinv[str(uid)]) ==True:
+        itemid = findStr(tid,combatinv[str(uid)])
+        
+
+      
+        
+      
 
     
 

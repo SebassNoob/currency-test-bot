@@ -1,7 +1,7 @@
 import os
 import discord
 from discord.ext import commands
-from async_functions import addDataBal, addDataCombatInv,addDataLoadout,addDataLvl
+from async_functions import addDataBal, addDataCombatInv,addDataLoadout,addDataLvl, addDataInv
 from keepAlive import keep_alive
 
 
@@ -14,6 +14,7 @@ async def on_message(message):
   if message.author == bot.user:
     return
   else:
+    await addDataInv(message.author.id)
     await addDataBal(message.author.id)
     await addDataCombatInv(message.author.id)
     await addDataLoadout(message.author.id)
